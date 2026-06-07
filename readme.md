@@ -16,4 +16,4 @@ Os artefatos textuais de engenharia de software (Requisitos Funcionais, Não Fun
 
 ## 📋 Declaração de Uso de IA
 * **Ferramenta utilizada:** Gemini 1.5 Pro
-* **Contexto de uso:** Apoio no refinamento arquitetural das classes de domínio em Python e estruturação inicial dos requisitos de software (APS), garantindo o alinhamento com os padrões de projeto propostos em aula.
+* **Contexto de uso:** Apoio para fazer debug do código, nomeclaturas e documentação do projeto
