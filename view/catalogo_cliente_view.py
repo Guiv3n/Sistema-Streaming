@@ -46,17 +46,20 @@ class CatalogoClienteView:
         self.carregar_usuarios_no_combo()
 
     def __criar_barra_busca(self):
-        """Barra de pesquisa por título - UC04 e RF08"""
+        """Barra de pesquisa por título e tipo - UC04 e RF08"""
         frame_busca = ttk.Frame(self.root, padding=5)
         frame_busca.pack(fill="x", padx=15, pady=5)
 
         ttk.Label(frame_busca, text="Buscar por Título:").pack(side="left", padx=5)
-        
-        self.txt_busca = ttk.Entry(frame_busca, width=40)
+        self.txt_busca = ttk.Entry(frame_busca, width=30)
         self.txt_busca.pack(side="left", padx=5)
-        
-        # Evento que dispara a busca a cada tecla digitada
         self.txt_busca.bind("<KeyRelease>", self.acao_filtrar_busca)
+
+        ttk.Label(frame_busca, text="Filtrar Tipo:").pack(side="left", padx=5)
+        self.cb_filtro_tipo = ttk.Combobox(frame_busca, values=["TODOS", "FILME", "SERIE", "ANIMACAO"], state="readonly", width=12)
+        self.cb_filtro_tipo.set("TODOS")
+        self.cb_filtro_tipo.pack(side="left", padx=5)
+        self.cb_filtro_tipo.bind("<<ComboboxSelected>>", self.acao_filtrar_busca)
 
     def __criar_tabela_catalogo(self):
         """Tabela para exibir as mídias disponíveis no PostgreSQL"""
@@ -129,12 +132,21 @@ class CatalogoClienteView:
             ))
 
     def acao_filtrar_busca(self, event=None):
-        """Filtra a listagem na tela conforme o texto digitado (Busca local reativa)"""
+        """Filtra dinamicamente por título E tipo de mídia combinado (UC04)"""
         termo = self.txt_busca.get().lower().strip()
-        lista_completa = self.conteudo_ctrl.listar_catalogo()
+        tipo_filtro = self.cb_filtro_tipo.get()
         
-        # Filtra os objetos cujo título contenha o termo digitado
-        lista_filtrada = [item for item in lista_completa if termo in item.titulo.lower()]
+        lista_completa = self.conteudo_ctrl.listar_catalogo()
+        lista_filtrada = []
+
+        for item in lista_completa:
+            nome_classe = item.__class__.__name__.upper()
+            corresponde_titulo = termo in item.titulo.lower()
+            corresponde_tipo = (tipo_filtro == "TODOS" or nome_classe == tipo_filtro)
+            
+            if corresponde_titulo and corresponde_tipo:
+                lista_filtrada.append(item)
+                
         self.atualizar_tabela_local(lista_filtrada)
 
     def acao_assistir_video(self):

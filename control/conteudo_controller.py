@@ -13,21 +13,21 @@ class ConteudoController:
     def cadastrar_conteudo(self, dados: dict) -> tuple[bool, str]:
         """
         Recebe os dados da View na forma de dicionário, valida e 
-        aplica o Factory/Polimorfismo para salvar no banco.
+        aplica o Factory/Polimorfismo para salvar ou atualizar no banco.
         """
-        # Validação básica de campos obrigatórios comuns
         if not dados.get("titulo") or not dados.get("ano_lancamento") or not dados.get("duracao_min"):
             return False, "Erro: Título, Ano e Duração são campos obrigatórios."
 
         try:
             tipo = dados.get("tipo").upper()
-            
+            id_conteudo = dados.get("id_conteudo")  # Captura o ID caso seja fluxo de alteração
+
             # Padrão Factory: Instancia a classe filha correta baseada no tipo
             if tipo == "FILME":
                 if not dados.get("diretor"):
                     return False, "Erro: O campo Diretor é obrigatório para Filmes."
                 novo_conteudo = Filme(
-                    id_conteudo=None, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
+                    id_conteudo=id_conteudo, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
                     duracao_min=int(dados["duracao_min"]), eh_original=bool(dados.get("eh_original")),
                     eh_lancamento=bool(dados.get("eh_lancamento")), diretor=dados["diretor"],
                     nota_imdb=float(dados.get("nota_imdb", 0.0))
@@ -37,7 +37,7 @@ class ConteudoController:
                 if not dados.get("qtd_temporadas"):
                     return False, "Erro: Quantidade de temporadas é obrigatória para Séries."
                 novo_conteudo = Serie(
-                    id_conteudo=None, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
+                    id_conteudo=id_conteudo, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
                     duracao_min=int(dados["duracao_min"]), eh_original=bool(dados.get("eh_original")),
                     eh_lancamento=bool(dados.get("eh_lancamento")), qtd_temporadas=int(dados["qtd_temporadas"])
                 )
@@ -46,14 +46,16 @@ class ConteudoController:
                 if not dados.get("estudio_animacao"):
                     return False, "Erro: Estúdio de animação é obrigatório para Animações."
                 novo_conteudo = Animacao(
-                    id_conteudo=None, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
+                    id_conteudo=id_conteudo, titulo=dados["titulo"], ano_lancamento=int(dados["ano_lancamento"]),
                     duracao_min=int(dados["duracao_min"]), eh_original=bool(dados.get("eh_original")),
                     eh_lancamento=bool(dados.get("eh_lancamento")), estudio_animacao=dados["estudio_animacao"]
                 )
             else:
                 return False, "Erro: Tipo de conteúdo inválido."
 
-            # Chama a persistência para gravar no PostgreSQL
+            # Desvia o fluxo: Se houver ID persistido, executa UPDATE, senão executa INSERT
+            if id_conteudo:
+                return self.__dao.atualizar(novo_conteudo)
             return self.__dao.salvar(novo_conteudo)
 
         except ValueError:
@@ -72,8 +74,8 @@ class ConteudoController:
 
     def verificar_permissao_reproducao(self, usuario: Usuario, id_conteudo: int) -> tuple[bool, str]:
         """
-        REGRA DE NEGÓCIO (RN01 e RN02): Valida se o plano do usuário 
-        permite assistir ao conteúdo selecionado (Conforme o Diagrama de Sequência).
+        REGRA DE NEGÓCIO (RN01 e RN02) + DESIGN PATTERN STRATEGY:
+        Valida o acesso e delega a reprodução polimórfica para o modelo.
         """
         conteudo = self.__dao.buscar_por_id(id_conteudo)
         if not conteudo:
@@ -83,10 +85,8 @@ class ConteudoController:
         if conteudo.eh_lancamento and usuario.plano == EnumPlano.PADRAO:
             return False, "Bloqueado: Conteúdos em lançamento são exclusivos para assinantes Premium!"
 
-        # RN02: Define a qualidade de reprodução simulada com base no plano
-        if usuario.plano == EnumPlano.PREMIUM:
-            qualidade = "4K Ultra HD"
-        else:
-            qualidade = "HD Standard"
+        # Se passou na trava RN01, configura a estratégia do usuário e roda o Strategy (RN02)
+        usuario.configurar_estrategia_por_plano() 
+        mensagem_reproducao = usuario.assistir(conteudo)
 
-        return True, f"Reproduzindo '{conteudo.titulo}' em qualidade {qualidade}..."
+        return True, mensagem_reproducao

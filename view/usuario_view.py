@@ -9,35 +9,29 @@ class UsuarioView:
         self.root.geometry("750x500")
         
         self.controller = UsuarioController()
+        self.id_usuario_edicao = None  # Controle de estado de edição
         
-        # --- COMPONENTES DA TELA ---
         self.__criar_formulario()
         self.__criar_tabela()
-        
-        # Carrega os usuários existentes do banco assim que a tela abre
         self.atualizar_tabela_local()
 
     def __criar_formulario(self):
-        frame_form = ttk.LabelFrame(self.root, text=" Cadastro de Novo Usuário / Cliente ", padding=10)
+        frame_form = ttk.LabelFrame(self.root, text=" Cadastro / Edição de Usuário Cliente ", padding=10)
         frame_form.pack(fill="x", padx=15, pady=10)
 
-        # Campo: Nome
         ttk.Label(frame_form, text="Nome:").grid(row=0, column=0, sticky="w", pady=5)
         self.txt_nome = ttk.Entry(frame_form, width=35)
         self.txt_nome.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
-        # Campo: E-mail
         ttk.Label(frame_form, text="E-mail:").grid(row=0, column=2, sticky="w", pady=5)
         self.txt_email = ttk.Entry(frame_form, width=35)
         self.txt_email.grid(row=0, column=3, padx=5, pady=5, sticky="w")
 
-        # Campo: Plano
         ttk.Label(frame_form, text="Plano de Acesso:").grid(row=1, column=0, sticky="w", pady=5)
         self.cb_plano = ttk.Combobox(frame_form, values=["PADRAO", "PREMIUM"], state="readonly", width=15)
         self.cb_plano.grid(row=1, column=1, padx=5, pady=5, sticky="w")
         self.cb_plano.set("PADRAO")
 
-        # --- BOTÕES ---
         frame_botoes = ttk.Frame(self.root, padding=5)
         frame_botoes.pack(fill="x", padx=15)
 
@@ -48,7 +42,7 @@ class UsuarioView:
         self.btn_excluir.pack(side="left", padx=5)
 
     def __criar_tabela(self):
-        frame_tabela = ttk.LabelFrame(self.root, text=" Clientes Cadastrados no PostgreSQL ", padding=5)
+        frame_tabela = ttk.LabelFrame(self.root, text=" Clientes Cadastrados no PostgreSQL (Duplo clique para editar) ", padding=5)
         frame_tabela.pack(fill="both", expand=True, padx=15, pady=10)
 
         colunas = ("id", "nome", "email", "plano")
@@ -65,11 +59,29 @@ class UsuarioView:
         self.tabela.column("plano", width=120, anchor="center")
 
         self.tabela.pack(fill="both", expand=True)
+        self.tabela.bind("<Double-1>", self.acao_carregar_campos_para_edicao)
+
+    def acao_carregar_campos_para_edicao(self, event=None):
+        """Interpola a linha selecionada de volta para as caixas de entrada (UC01)"""
+        selecionado = self.tabela.selection()
+        if not selecionado: 
+            return
+            
+        valores = self.tabela.item(selecionado[0], "values")
+        self.id_usuario_edicao = int(valores[0])
+        
+        self.txt_nome.delete(0, tk.END)
+        self.txt_nome.insert(0, valores[1])
+        
+        self.txt_email.delete(0, tk.END)
+        self.txt_email.insert(0, valores[2])
+        
+        self.cb_plano.set(valores[3])
+        self.btn_salvar.config(text="Atualizar Plano/Dados")
 
     def atualizar_tabela_local(self):
-        """Busca os dados atualizados na Controller e recarrega o Treeview"""
-        for linha in self.tabela.get_children():
-            self.tabela.delete(linha)
+        for row in self.tabela.get_children():
+            self.tabela.delete(row)
 
         lista_usuarios = self.controller.listar_usuarios()
         for usr in lista_usuarios:
@@ -77,7 +89,7 @@ class UsuarioView:
                 usr.id_usuario,
                 usr.nome,
                 usr.email,
-                usr.plano.name  # Pega o texto limpo do Enum (.name)
+                usr.plano.name
             ))
 
     def acao_salvar(self):
@@ -85,7 +97,7 @@ class UsuarioView:
         email = self.txt_email.get()
         plano = self.cb_plano.get()
 
-        sucesso, mensagem = self.controller.cadastrar_usuario(nome, email, plano)
+        sucesso, mensagem = self.controller.cadastrar_usuario(nome, email, plano, self.id_usuario_edicao)
         
         if sucesso:
             messagebox.showinfo("Sucesso", mensagem)
@@ -93,8 +105,10 @@ class UsuarioView:
             self.txt_nome.delete(0, tk.END)
             self.txt_email.delete(0, tk.END)
             self.cb_plano.set("PADRAO")
+            self.id_usuario_edicao = None
+            self.btn_salvar.config(text="Cadastrar no Banco")
         else:
-            messagebox.showerror("Erro de Cadastro", mensagem)
+            messagebox.showerror("Erro de Cadastro/Edição", mensagem)
 
     def acao_excluir(self):
         selecionado = self.tabela.selection()
@@ -111,6 +125,10 @@ class UsuarioView:
             if sucesso:
                 messagebox.showinfo("Sucesso", mensaje)
                 self.atualizar_tabela_local()
+                self.txt_nome.delete(0, tk.END)
+                self.txt_email.delete(0, tk.END)
+                self.id_usuario_edicao = None
+                self.btn_salvar.config(text="Cadastrar no Banco")
             else:
                 messagebox.showerror("Erro ao Deletar", mensaje)
 

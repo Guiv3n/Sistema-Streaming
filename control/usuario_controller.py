@@ -7,9 +7,8 @@ class UsuarioController:
     def __init__(self):
         self.__dao = UsuarioDAO()
 
-    def cadastrar_usuario(self, nome: str, email: str, plano_str: str) -> tuple[bool, str]:
-        """Valida os dados da tela e envia para o banco de dados"""
-        # Validação de campos em branco
+    def cadastrar_usuario(self, nome: str, email: str, plano_str: str, id_usuario: int = None) -> tuple[bool, str]:
+        """Valida os dados e decide entre criar um novo cliente ou atualizar o existente"""
         if not nome.strip() or not email.strip():
             return False, "Erro: Nome e E-mail são campos obrigatórios."
         
@@ -17,13 +16,13 @@ class UsuarioController:
             return False, "Erro: Digite um endereço de e-mail válido."
 
         try:
-            # Converte a string da tela ('PADRAO' ou 'PREMIUM') para o Enum real
             plano_enum = EnumPlano[plano_str.upper()]
             
-            # Instancia o modelo puro (id_usuario vai como None pois o SERIAL do Postgres resolve)
-            novo_usuario = Usuario(id_usuario=None, nome=nome.strip(), email=email.strip(), plano=plano_enum)
+            # Instancia o objeto Usuario vinculando o ID apropriado
+            novo_usuario = Usuario(id_usuario=id_usuario, nome=nome.strip(), email=email.strip(), plano=plano_enum)
             
-            # Repassa para o DAO salvar fisicamente no PostgreSQL
+            if id_usuario:
+                return self.__dao.atualizar(novo_usuario)
             return self.__dao.salvar(novo_usuario)
             
         except KeyError:
@@ -32,7 +31,6 @@ class UsuarioController:
             return False, f"Erro no controlador de usuários: {e}"
 
     def listar_usuarios(self) -> list:
-        """Retorna a lista de objetos Usuario vindos do banco"""
         return self.__dao.listar_todos()
 
     def excluir_usuario(self, id_usuario: int) -> tuple[bool, str]:
